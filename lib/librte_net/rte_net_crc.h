@@ -15,7 +15,8 @@ extern "C" {
 enum rte_net_crc_type {
 	RTE_NET_CRC16_CCITT = 0,
 	RTE_NET_CRC32_ETH,
-	RTE_NET_CRC_REQS
+	RTE_NET_CRC_REQS,
+	RTE_NET_CRC16_USB
 };
 
 /** CRC compute algorithm */

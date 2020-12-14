@@ -18,15 +18,20 @@
 /** CRC polynomials */
 #define CRC32_ETH_POLYNOMIAL 0x04c11db7UL
 #define CRC16_CCITT_POLYNOMIAL 0x1021U
+#define CRC16_USB_POLYNOMIAL 0x8005U
 
 #define CRC_LUT_SIZE 256
 
 /* crc tables */
 static uint32_t crc32_eth_lut[CRC_LUT_SIZE];
 static uint32_t crc16_ccitt_lut[CRC_LUT_SIZE];
+static uint32_t crc16_usb_lut[CRC_LUT_SIZE];
 
 static uint32_t
 rte_crc16_ccitt_default_handler(const uint8_t *data, uint32_t data_len);
+
+static uint32_t
+rte_crc16_usb_default_handler(const uint8_t *data, uint32_t data_len);
 
 static uint32_t
 rte_crc32_eth_default_handler(const uint8_t *data, uint32_t data_len);
@@ -37,12 +42,16 @@ rte_crc16_ccitt_handler(const uint8_t *data, uint32_t data_len);
 static uint32_t
 rte_crc32_eth_handler(const uint8_t *data, uint32_t data_len);
 
+static uint32_t
+rte_crc16_usb_handler(const uint8_t *data, uint32_t data_len);
+
 typedef uint32_t
 (*rte_net_crc_handler)(const uint8_t *data, uint32_t data_len);
 
 static rte_net_crc_handler handlers_default[] = {
 	[RTE_NET_CRC16_CCITT] = rte_crc16_ccitt_default_handler,
 	[RTE_NET_CRC32_ETH] = rte_crc32_eth_default_handler,
+	[RTE_NET_CRC16_USB] = rte_crc16_usb_default_handler,
 };
 
 static const rte_net_crc_handler *handlers = handlers_default;
@@ -50,6 +59,7 @@ static const rte_net_crc_handler *handlers = handlers_default;
 static const rte_net_crc_handler handlers_scalar[] = {
 	[RTE_NET_CRC16_CCITT] = rte_crc16_ccitt_handler,
 	[RTE_NET_CRC32_ETH] = rte_crc32_eth_handler,
+	[RTE_NET_CRC16_USB] = rte_crc16_usb_handler,
 };
 #ifdef CC_X86_64_AVX512_VPCLMULQDQ_SUPPORT
 static const rte_net_crc_handler handlers_avx512[] = {
@@ -140,6 +150,7 @@ rte_net_crc_scalar_init(void)
 
 	/* 16-bit CRC init */
 	crc32_eth_init_lut(CRC16_CCITT_POLYNOMIAL << 16, crc16_ccitt_lut);
+	crc32_eth_init_lut(CRC16_USB_POLYNOMIAL << 16, crc16_usb_lut);
 }
 
 static inline uint32_t
@@ -160,6 +171,16 @@ rte_crc32_eth_handler(const uint8_t *data, uint32_t data_len)
 		data_len,
 		0xffffffffUL,
 		crc32_eth_lut);
+}
+
+static inline uint32_t
+rte_crc16_usb_handler(const uint8_t *data, uint32_t data_len)
+{
+	/* return 16-bit CRC value */
+	return (uint16_t)~crc32_eth_calc_lut(data,
+		data_len,
+		0xffff,
+		crc16_usb_lut);
 }
 
 /* AVX512/VPCLMULQDQ handling */
@@ -286,6 +307,26 @@ rte_crc32_eth_default_handler(const uint8_t *data, uint32_t data_len)
 		return handlers[RTE_NET_CRC32_ETH](data, data_len);
 	handlers = handlers_scalar;
 	return handlers[RTE_NET_CRC32_ETH](data, data_len);
+}
+
+static uint32_t
+rte_crc16_usb_default_handler(const uint8_t *data, uint32_t data_len)
+{
+	/*handlers = NULL;
+	if (max_simd_bitwidth == 0)
+		max_simd_bitwidth = rte_vect_get_max_simd_bitwidth();
+
+	handlers = avx512_vpclmulqdq_get_handlers();
+	if (handlers != NULL)
+		return handlers[RTE_NET_CRC16_CCITT](data, data_len);
+	handlers = sse42_pclmulqdq_get_handlers();
+	if (handlers != NULL)
+		return handlers[RTE_NET_CRC16_CCITT](data, data_len);
+	handlers = neon_pmull_get_handlers();
+	if (handlers != NULL)
+		return handlers[RTE_NET_CRC16_CCITT](data, data_len);*/
+	handlers = handlers_scalar;
+	return handlers[RTE_NET_CRC16_USB](data, data_len);
 }
 
 /* Public API */
